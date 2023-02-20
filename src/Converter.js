@@ -23,7 +23,6 @@ module.exports = class Converter {
             for (const [extension, lang] of Object.entries(this.languages)) {
                 if (file.endsWith(extension)) {
                     const name = file.split(".");
-                    console.log(fullPath == undefined ? path.join(__dirname, dir, file) : fullPath)
                     if(this.files.has(name[0])) {
                         if("." + name[1] != extension) {
                             this.files.set(name[0] + (parseInt(name[1]) + 1), {
@@ -55,7 +54,6 @@ module.exports = class Converter {
     }
 
     async detect(file) {
-        // console.log(file)
         const readline = Readline.createInterface({
             input: fs.createReadStream(file),
         });
@@ -94,5 +92,31 @@ module.exports = class Converter {
         let fileLang = python2 > python3 ? "python2" : "python3"
         fileLang = javascript > python2 ? "javascript" : fileLang
         return fileLang
+    }
+
+    async convert(file, langToTranslate) {
+        const lang = await this.detect(file.fullPath)
+
+        const readline = Readline.createInterface({
+            input: fs.createReadStream(file.fullPath),
+        });
+
+        readline.on('line', (line) => {
+            if (lang == "python2") {
+                if (langToTranslate == "python3") {
+                    if (line.includes("print")) {
+                        let args = line.split("print")[1].split(")")[0].split(",")
+                        line = 'print(' + args.join(", ") + ')'
+                    }
+                    if (line.includes("raw_input(")) {
+                        let args = line.split("raw_input(")[1].split(")")[0].split(",")
+                        line = 'str(input(' + args.join(", ") + '))'
+                    }
+                }
+            } else if (lang == "python3") {
+
+            }
+            console.log(line)
+        })
     }
 }
