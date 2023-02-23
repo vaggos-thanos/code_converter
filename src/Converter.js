@@ -101,6 +101,7 @@ module.exports = class Converter {
             input: fs.createReadStream(file.fullPath),
         });
 
+        let convertedFile = ''
         readline.on('line', (line) => {
             if (lang == "python2") {
                 if (langToTranslate == "python3") {
@@ -110,13 +111,18 @@ module.exports = class Converter {
                     }
                     if (line.includes("raw_input(")) {
                         let args = line.split("raw_input(")[1].split(")")[0].split(",")
-                        line = 'str(input(' + args.join(", ") + '))'
+                        line = line.split('=')[0] + '= str(input(' + args.join(", ") + '))'
                     }
                 }
             } else if (lang == "python3") {
 
             }
-            console.log(line)
+            convertedFile += line + '\n'
+        })
+
+        readline.on("close", () => {
+            const name = file.fullPath.split('test_files/')[1]
+            fs.writeFileSync(`done/${name}`, convertedFile);
         })
     }
 }
