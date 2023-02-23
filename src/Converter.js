@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const Readline = require('readline');
+const OS = require('os');
 
 module.exports = class Converter {
     constructor() {
@@ -18,52 +19,33 @@ module.exports = class Converter {
     }
 
     async scan(dir, fullPath) {
-        const files = fs.readdirSync(path.join(__dirname, dir))
         try {
+            const files = fs.readdirSync(path.join(__dirname, dir))
             for (const file of files) {
                 for (const [extension, lang] of Object.entries(this.languages)) {
                     if (file.endsWith(extension)) {
                         const name = file.split(".");
-                        console.log(name)
-                        console.log("." + name[1])
-                        if(!this.files.has(name[0])) {
-                            if("." + name[0] != extension) {
-                                this.files.set(name[0] + (parseInt(name[1]) + 1), {
-                                    fullPath: fullPath == undefined ? path.join(__dirname, dir, file) : fullPath,
-                                    extension: extension,
-                                    lang: lang,
-                                    fileName: file,
-                                });
-                            } else {
-                                this.files.set(name[0] + ".1", {
-                                    fullPath: fullPath == undefined ? path.join(__dirname, dir, file) : fullPath,
-                                    extension: extension,
-                                    lang: lang,
-                                    fileName: file,
-                                });
-                            }
-                            const data = {
-                                fullPath: fullPath == undefined ? path.join(__dirname, dir, file) : fullPath,
-                                extension: extension,
-                                lang: lang,
-                                fileName: file,
-                            }
-                            
-                            if(this.files.has(name[0])) {
-                                if("." + name[1] != extension) {
-                                    this.files.set(name[0] + (parseInt(name[1]) + 1), data);
-                                } else {
-                                    this.files.set(name[0] + ".1", data);
-                                }
-                            } else {
-                                this.files.set(name[0], data);
-                            }
-                            
-                        } else if (fs.lstatSync(path.join(__dirname, dir, file)).isDirectory()) {
-                            this.scan(path.join(dir, file), path.join(__dirname, dir, file))
-                        } else {
-                            // console.log("File not supported")
+                        const data = {
+                            fullPath: fullPath == undefined ? path.join(__dirname, dir, file) : path.join(fullPath, file),
+                            extension: extension,
+                            lang: lang,
+                            fileName: file,
                         }
+
+                        if(this.files.has(name[0])) {
+                            if("." + name[1] != extension) {
+                                this.files.set(name[0] + (parseInt(name[1]) + 1), data);
+                            } else {
+                                this.files.set(name[0] + ".1", data);
+                            }
+                        } else {
+                            this.files.set(name[0], data);
+                        }
+                        
+                    } else if (fs.lstatSync(path.join(__dirname, dir, file)).isDirectory()) {
+                        this.scan(path.join(dir, file), path.join(__dirname, dir, file))
+                    } else {
+                        // console.log("File not supported")
                     }
                 }
             }
@@ -124,43 +106,70 @@ module.exports = class Converter {
         return {lang: fileLang, percition: Math.round((python2 + python3 + javascript) / divNum * 100) + "%"}
     }
 
-    async convert(fileData, converLang) {
-        const filePath = fileData.fullPath
-        const fetchedLang = await (this.detect(filePath))
-        const lang = fetchedLang.lang.version == null ? 'javascript' : 'python' + fetchedLang.lang.version
-
-        return "File langugage: " + lang + " \nDeteceted with: " + fetchedLang.percition + " percition"
-    }
-
     async convert(file, langToTranslate) {
+        console.log("Converting " + file.fileName + " to " + langToTranslate)
         const lang = await this.detect(file.fullPath)
-
         const readline = Readline.createInterface({
             input: fs.createReadStream(file.fullPath),
         });
 
         let convertedFile = ''
         readline.on('line', (line) => {
-            if (lang == "python2") {
+            if (lang.lang.name == "python2") {
                 if (langToTranslate == "python3") {
                     if (line.includes("print")) {
-                        let args = line.split("print")[1].split(")")[0].split(",")
-                        line = 'print(' + args.join(", ") + ')'
+                        let print = line.split("print")
+                        let args = print[1].split(",")
+                        line = print[0] + 'print(' + args.join(", ") + ')'
                     }
                     if (line.includes("raw_input(")) {
                         let args = line.split("raw_input(")[1].split(")")[0].split(",")
                         line = line.split('=')[0] + '= str(input(' + args.join(", ") + '))'
                     }
                 }
-            } else if (lang == "python3") {
-
+            } else if (lang.lang.name == "python3") {
+                if (langToTranslate == "python2") {
+                    if (line.includes("print(")) {
+                        let print = line.split("print(")
+                        let args = print[1].substring(0, print[1].length - 1).split(",")
+                        line = print[0] + 'print ' + args.join(", ")
+                    }
+                    if (line.includes("input(")) {
+                        let args = line.split("input(")[1].split(")")[0].split(",")
+                        line = line.split('=')[0] + '= raw_input(' + args.join(", ") + ')'
+                    }
+                }
             }
             convertedFile += line + '\n'
         })
 
         readline.on("close", () => {
-            const name = file.fullPath.split('test_files/')[1]
+            const os = (OS.type()).toLowerCase()
+            let name = ""
+            if(os.includes("windows")) {
+                name = file.fullPath.split('test_files\\')[1]
+                if(name.includes("\\")) {
+                    name = name.split("\\")
+                }
+            } else {
+                file.fullPath.split('test_files/')[1]
+                if(name.includes("/")) {
+                    name = name.split("/")
+                }
+            }
+            if(Array.isArray(name)) {
+                let tempPath = ""
+                for (let i = 0; i < name.length - 1; i++) {
+                    tempPath += name[i] + "/"
+                    fs.mkdirSync(`done/${tempPath}`, { recursive: true })
+                }
+
+
+                name = name.join("/")
+            }
             fs.writeFileSync(`done/${name}`, convertedFile);
+
         })
+
     }
 }
