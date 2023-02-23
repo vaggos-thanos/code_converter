@@ -20,6 +20,8 @@ module.exports = class Converter {
 
     async scan(dir, fullPath) {
         try {
+            await this.createFiles()
+            console.log("Scanning " + dir)
             const files = fs.readdirSync(path.join(__dirname, dir))
             for (const file of files) {
                 for (const [extension, lang] of Object.entries(this.languages)) {
@@ -147,12 +149,12 @@ module.exports = class Converter {
             const os = (OS.type()).toLowerCase()
             let name = ""
             if(os.includes("windows")) {
-                name = file.fullPath.split('test_files\\')[1]
+                name = file.fullPath.split('files_to_convert\\')[1]
                 if(name.includes("\\")) {
                     name = name.split("\\")
                 }
             } else {
-                file.fullPath.split('test_files/')[1]
+                file.fullPath.split('files_to_convert/')[1]
                 if(name.includes("/")) {
                     name = name.split("/")
                 }
@@ -171,5 +173,15 @@ module.exports = class Converter {
 
         })
 
+    }
+
+    async createFiles() {
+        if (!fs.existsSync("done")) {
+            fs.mkdirSync(`done`, { recursive: true })
+        }
+        if (!fs.existsSync("files_to_convert")) {
+            fs.mkdirSync(`files_to_convert`, { recursive: true })
+        }
+        console.log("Created files")
     }
 }
