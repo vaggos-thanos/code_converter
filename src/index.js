@@ -6,4 +6,4 @@ converter.scan('../test_files');
         // console.log(data)
         console.log(await converter.convert(data, "python3"))
     }
-})()
+})();

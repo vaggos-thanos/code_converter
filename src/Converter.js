@@ -39,17 +39,26 @@ module.exports = class Converter {
                                 fileName: file,
                             });
                         }
+
+                        if(this.files.has(name[0])) {
+                            if("." + name[1] != extension) {
+                                this.files.set(name[0] + (parseInt(name[1]) + 1), data);
+                            } else {
+                                this.files.set(name[0] + ".1", data);
+                            }
+                        } else {
+                            this.files.set(name[0], data);
+                        }
+                        
+                    } else if (fs.lstatSync(path.join(__dirname, dir, file)).isDirectory()) {
+                        this.scan(path.join(dir, file), path.join(__dirname, dir, file))
+                    } else {
+                        // console.log("File not supported")
                     }
-                    this.files.set(name[0], {
-                        fullPath: fullPath == undefined ? path.join(__dirname, dir, file) : fullPath,
-                        extension: extension,
-                        lang: lang,
-                        fileName: file,
-                    });
-                } else if (fs.lstatSync(path.join(__dirname, dir, file)).isDirectory()) {
-                    this.scan(path.join(dir, file), path.join(__dirname, dir, file))
                 }
             }
+        } catch (error) {
+            console.log(error);
         }
     }
 
@@ -57,6 +66,7 @@ module.exports = class Converter {
         const readline = Readline.createInterface({
             input: fs.createReadStream(file),
         });
+        
         const points = {
             python2: 0,
             python3: 0,
@@ -65,7 +75,10 @@ module.exports = class Converter {
         
         let sleep = true
         readline.on("line", async (text) => {
-            if (text.includes("print(")) {
+            if (
+                text.includes("print(") || 
+                text.includes("str(input(")      
+            ) {
                 points.python3 += 1
             }
 
@@ -83,15 +96,30 @@ module.exports = class Converter {
         })
 
         while (sleep) {
-            await new Promise(r => setTimeout(r, 500));
+            await new Promise(r => setTimeout(r, 1));
         }
         
         const python2 = points.python2
         const python3 = points.python3
         const javascript = points.javascript
-        let fileLang = python2 > python3 ? "python2" : "python3"
-        fileLang = javascript > python2 ? "javascript" : fileLang
-        return fileLang
+        
+        let fileLang = python2 > python3 ? {name: "python2", version: 2} : {name: "python3", version: 3}
+        fileLang = javascript > python2 ? {name: "javascript", version: null} : fileLang
+
+        let divNum = 0
+
+        if (python2 > 0) divNum++
+        if (python3 > 0) divNum++
+        if (javascript > 0) divNum++
+        return {lang: fileLang, percition: Math.round((python2 + python3 + javascript) / divNum * 100) + "%"}
+    }
+
+    async convert(fileData, converLang) {
+        const filePath = fileData.fullPath
+        const fetchedLang = await (this.detect(filePath))
+        const lang = fetchedLang.lang.version == null ? 'javascript' : 'python' + fetchedLang.lang.version
+
+        return "File langugage: " + lang + " \nDeteceted with: " + fetchedLang.percition + " percition"
     }
 
     async convert(file, langToTranslate) {
