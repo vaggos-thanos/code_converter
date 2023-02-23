@@ -19,41 +19,51 @@ module.exports = class Converter {
 
     async scan(dir, fullPath) {
         const files = fs.readdirSync(path.join(__dirname, dir))
-        for (const file of files) {
-            for (const [extension, lang] of Object.entries(this.languages)) {
-                if (file.endsWith(extension)) {
-                    const name = file.split(".");
-                    if(this.files.has(name[0])) {
-                        if("." + name[1] != extension) {
-                            this.files.set(name[0] + (parseInt(name[1]) + 1), {
-                                fullPath: fullPath == undefined ? path.join(__dirname, dir, file) : fullPath,
-                                extension: extension,
-                                lang: lang,
-                                fileName: file,
-                            });
-                        } else {
-                            this.files.set(name[0] + ".1", {
-                                fullPath: fullPath == undefined ? path.join(__dirname, dir, file) : fullPath,
-                                extension: extension,
-                                lang: lang,
-                                fileName: file,
-                            });
-                        }
-
-                        if(this.files.has(name[0])) {
-                            if("." + name[1] != extension) {
-                                this.files.set(name[0] + (parseInt(name[1]) + 1), data);
+        try {
+            for (const file of files) {
+                for (const [extension, lang] of Object.entries(this.languages)) {
+                    if (file.endsWith(extension)) {
+                        const name = file.split(".");
+                        console.log(name)
+                        console.log("." + name[1])
+                        if(!this.files.has(name[0])) {
+                            if("." + name[0] != extension) {
+                                this.files.set(name[0] + (parseInt(name[1]) + 1), {
+                                    fullPath: fullPath == undefined ? path.join(__dirname, dir, file) : fullPath,
+                                    extension: extension,
+                                    lang: lang,
+                                    fileName: file,
+                                });
                             } else {
-                                this.files.set(name[0] + ".1", data);
+                                this.files.set(name[0] + ".1", {
+                                    fullPath: fullPath == undefined ? path.join(__dirname, dir, file) : fullPath,
+                                    extension: extension,
+                                    lang: lang,
+                                    fileName: file,
+                                });
                             }
+                            const data = {
+                                fullPath: fullPath == undefined ? path.join(__dirname, dir, file) : fullPath,
+                                extension: extension,
+                                lang: lang,
+                                fileName: file,
+                            }
+                            
+                            if(this.files.has(name[0])) {
+                                if("." + name[1] != extension) {
+                                    this.files.set(name[0] + (parseInt(name[1]) + 1), data);
+                                } else {
+                                    this.files.set(name[0] + ".1", data);
+                                }
+                            } else {
+                                this.files.set(name[0], data);
+                            }
+                            
+                        } else if (fs.lstatSync(path.join(__dirname, dir, file)).isDirectory()) {
+                            this.scan(path.join(dir, file), path.join(__dirname, dir, file))
                         } else {
-                            this.files.set(name[0], data);
+                            // console.log("File not supported")
                         }
-                        
-                    } else if (fs.lstatSync(path.join(__dirname, dir, file)).isDirectory()) {
-                        this.scan(path.join(dir, file), path.join(__dirname, dir, file))
-                    } else {
-                        // console.log("File not supported")
                     }
                 }
             }
